@@ -4,3 +4,6 @@ data/*
 __pycache__/
 *.pyc
 .DS_Store
+
+public-demo/
+.vercel/

@@ -137,3 +137,17 @@ This remains a **loopback-only operator dashboard**. Read-only data is accessibl
 ### Populate the showcase dashboard
 
 Run `python3 seed_demo.py` to add 16 fictional multi-unit cases, notes, conversations, delivery outcomes, and five scheduling examples to `data/demo.sqlite3`. It preserves existing records, is safe to rerun, and never sends notifications or touches the live database. Open demo mode on port 8081 to view them. The multi-unit fixtures illustrate the dashboard; live Telegram onboarding remains limited to the configured tenant and unit.
+
+## Public Vercel showcase
+
+The public deployment is a separate static demo. It contains freshly generated fictional fixtures and a browser-local simulation adapter. No API keys, live SQLite data, or manager access key are included. Each visitor's changes stay in that browser's local storage; they are not shared with the live bot or other visitors. The model, notifications, and bookings are simulated.
+
+```sh
+python3 build_public_demo.py
+node tests/test_public_demo.cjs
+vercel deploy --prod --yes --scope haziqhalifis-projects --cwd public-demo
+```
+
+The generated `public-demo/` directory is ignored by Git. Its `.vercelignore` excludes credentials and deployment metadata. The first deployment requires `vercel link --yes --project tenant-triage --scope haziqhalifis-projects --cwd public-demo`. The source adapter is in `web-demo/demo-runtime.js`.
+
+The live Telegram bot continues running locally on port 8080. Moving that service to Vercel would require hosted durable storage, webhook handling, and production authentication.

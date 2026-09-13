@@ -1,4 +1,4 @@
-# TenantTriage
+# UnitCue — AI Maintenance Coordinator
 
 A Telegram maintenance agent that asks the missing question, tracks one active case per tenant, escalates worsening issues, and keeps the tenant updated when their property manager acknowledges the report.
 

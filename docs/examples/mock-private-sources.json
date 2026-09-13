@@ -1,0 +1,530 @@
+{
+  "metadata": {
+    "dataset": "TenantTriage mock private source pack",
+    "created_for": "demo and development only",
+    "created_on": "2026-09-13",
+    "property": "Sentul Residence",
+    "unit_scope": "fictional multi-unit maintenance workspace",
+    "privacy_note": "All people, contacts, vendors, clauses, appliance records, warranties, invoices, and approval limits in this file are synthetic placeholders."
+  },
+  "maintenance_sop": {
+    "version": "SOP-MOCK-2026-09",
+    "effective_from": "2026-09-01",
+    "timezone": "Asia/Kuala_Lumpur",
+    "response_targets": {
+      "low": {
+        "target_hours": 48,
+        "examples": [
+          "minor dripping tap",
+          "noise complaint without safety risk",
+          "cosmetic fitting issue"
+        ],
+        "tenant_message": "Your report has been saved. The property team response target is within 48 hours."
+      },
+      "medium": {
+        "target_hours": 48,
+        "examples": [
+          "air-conditioning not cooling",
+          "washing machine error",
+          "pest report in one room"
+        ],
+        "tenant_message": "Your report has been saved. The property team response target is within 48 hours."
+      },
+      "high": {
+        "target_hours": 2,
+        "examples": [
+          "active leak spreading",
+          "blocked toilet in the only bathroom",
+          "security or lock failure"
+        ],
+        "tenant_message": "Your report has been escalated. The property team response target is within 2 hours."
+      },
+      "crisis": {
+        "target_hours": 0,
+        "examples": [
+          "sparks",
+          "live wire",
+          "gas smell",
+          "fire",
+          "water reaching an electrical socket"
+        ],
+        "tenant_message": "Immediate human attention is needed. Keep away from the hazard and contact local emergency services if there is immediate danger."
+      }
+    },
+    "escalation_contacts": [
+      {
+        "role": "Property manager",
+        "name": "Farah Rahman",
+        "phone": "+60 12-000 4101",
+        "email": "farah.mock@example.test",
+        "hours": "Mon-Fri 09:00-18:00",
+        "use_for": [
+          "tenant communication",
+          "lease review",
+          "approval above routine spend"
+        ]
+      },
+      {
+        "role": "Duty manager",
+        "name": "Daniel Tan",
+        "phone": "+60 12-000 4102",
+        "email": "daniel.mock@example.test",
+        "hours": "Daily 18:00-09:00 and public holidays",
+        "use_for": [
+          "high priority after-hours reports",
+          "building access coordination",
+          "safety escalation"
+        ]
+      },
+      {
+        "role": "Maintenance coordinator",
+        "name": "Amir Salleh",
+        "phone": "+60 12-000 4103",
+        "email": "amir.mock@example.test",
+        "hours": "Mon-Sat 09:00-17:00",
+        "use_for": [
+          "contractor scheduling",
+          "quote collection",
+          "repair status updates"
+        ]
+      }
+    ],
+    "spending_approval_limits_myr": [
+      {
+        "threshold": 250,
+        "approval_required": "No pre-approval if vendor is approved and issue is routine",
+        "examples": [
+          "minor plumbing replacement",
+          "AC inspection",
+          "basic pest treatment"
+        ]
+      },
+      {
+        "threshold": 800,
+        "approval_required": "Property manager approval before work starts",
+        "examples": [
+          "washing machine pump replacement",
+          "water heater element replacement",
+          "electrical troubleshooting requiring parts"
+        ]
+      },
+      {
+        "threshold": 2000,
+        "approval_required": "Owner approval with written quote",
+        "examples": [
+          "major appliance replacement",
+          "concealed pipe repair",
+          "DB board repair"
+        ]
+      }
+    ],
+    "access_policy": {
+      "routine_access_notice_hours": 24,
+      "emergency_access_notice": "Contact tenant first where practical; duty manager may authorize emergency building access for active safety or flooding risks.",
+      "photo_handling": "Use photos only for maintenance assessment and contractor preparation."
+    }
+  },
+  "properties": [
+    {
+      "property_id": "PROP-SENTUL-MOCK",
+      "name": "Sentul Residence",
+      "address": "Jalan Sentul, 51000 Kuala Lumpur, Malaysia",
+      "building_management": {
+        "name": "Sentul Residence Management Office",
+        "phone": "+60 3-0000 5100",
+        "email": "management.mock@sentul-residence.example.test",
+        "hours": "Mon-Fri 09:00-17:30, Sat 09:00-13:00",
+        "emergency_contact": "+60 12-000 5199",
+        "verification_status": "mock placeholder; verify from resident app, notice board, or owner records"
+      },
+      "utility_guidance": [
+        {
+          "utility": "Electricity",
+          "provider": "TNB",
+          "official_source": "https://www.mytnb.com.my/contact-us",
+          "reporting_note": "For suspected TNB supply outage, ask whether neighbours or common areas are also affected before advising external reporting."
+        },
+        {
+          "utility": "Water",
+          "provider": "Air Selangor",
+          "official_source": "https://waterupdates.airselangor.com/",
+          "reporting_note": "Check official water disruption updates before treating building-wide water loss as an internal plumbing issue."
+        },
+        {
+          "utility": "Sewerage",
+          "provider": "Indah Water Konsortium",
+          "official_source": "https://www.iwk.com.my/contact-us",
+          "reporting_note": "Distinguish public sewer backflow from private internal pipe blockage."
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "unit_id": "B-12-03",
+      "property_id": "PROP-SENTUL-MOCK",
+      "tenant_name": "Aina",
+      "bedrooms": 2,
+      "bathrooms": 2,
+      "access_notes": [
+        "Tenant prefers weekday appointments after 14:00.",
+        "Building security requires contractor IC and unit confirmation at guard house.",
+        "No unattended entry unless duty manager approves emergency access."
+      ],
+      "installed_appliance_ids": [
+        "APL-B1203-AC-LIVING",
+        "APL-B1203-AC-MASTER",
+        "APL-B1203-WASHER",
+        "APL-B1203-HOOD",
+        "APL-B1203-WATERHEATER"
+      ]
+    },
+    {
+      "unit_id": "A-17-05",
+      "property_id": "PROP-SENTUL-MOCK",
+      "tenant_name": "Nur Iman",
+      "bedrooms": 3,
+      "bathrooms": 2,
+      "access_notes": [
+        "Tenant can attend mornings except Fridays.",
+        "Ask building management to reserve service lift for bulky appliance work."
+      ],
+      "installed_appliance_ids": [
+        "APL-A1705-WASHER",
+        "APL-A1705-AC-BEDROOM"
+      ]
+    }
+  ],
+  "tenancy_agreement_clause_index": [
+    {
+      "agreement_id": "TA-B1203-2026-MOCK",
+      "unit_id": "B-12-03",
+      "clause_id": "7.1",
+      "topic": "repairs",
+      "mock_clause_summary": "Tenant must promptly report defects, leaks, appliance faults, and safety hazards to the property manager.",
+      "agent_use": "Ask clarifying questions and save the report; do not decide liability."
+    },
+    {
+      "agreement_id": "TA-B1203-2026-MOCK",
+      "unit_id": "B-12-03",
+      "clause_id": "7.2",
+      "topic": "tenant responsibilities",
+      "mock_clause_summary": "Tenant is responsible for damage caused by misuse, negligence, or unauthorized alteration, subject to manager review.",
+      "agent_use": "Flag for manager review when the report suggests misuse or alteration."
+    },
+    {
+      "agreement_id": "TA-B1203-2026-MOCK",
+      "unit_id": "B-12-03",
+      "clause_id": "8.4",
+      "topic": "access",
+      "mock_clause_summary": "Manager or appointed contractor may enter with reasonable notice for inspection or repairs; emergency access may be arranged for urgent safety risks.",
+      "agent_use": "Request tenant availability for routine cases and escalate emergency access decisions to the manager."
+    },
+    {
+      "agreement_id": "TA-B1203-2026-MOCK",
+      "unit_id": "B-12-03",
+      "clause_id": "12.3",
+      "topic": "notice periods",
+      "mock_clause_summary": "Renewal, early termination, deposit, and notice questions require written manager response.",
+      "agent_use": "Route lease questions to human review."
+    }
+  ],
+  "appliances": [
+    {
+      "appliance_id": "APL-B1203-AC-LIVING",
+      "unit_id": "B-12-03",
+      "type": "air_conditioner",
+      "location": "living room",
+      "brand": "Daikin",
+      "model": "FTKF35B",
+      "serial_number": "MOCK-DAI-B1203-LR",
+      "installed_on": "2025-03-12",
+      "warranty_expires_on": "2027-03-11",
+      "manual_source_status": "needs official manufacturer URL verification",
+      "common_agent_prompts": [
+        "Is the unit cooling at all or blowing warm air?",
+        "Is water dripping from the indoor unit?",
+        "When was the filter last cleaned?",
+        "Is there an error code on the remote or display?"
+      ]
+    },
+    {
+      "appliance_id": "APL-B1203-AC-MASTER",
+      "unit_id": "B-12-03",
+      "type": "air_conditioner",
+      "location": "master bedroom",
+      "brand": "Panasonic",
+      "model": "CS-PU9XKH",
+      "serial_number": "MOCK-PAN-B1203-MBR",
+      "installed_on": "2024-11-20",
+      "warranty_expires_on": "2026-11-19",
+      "manual_source_status": "needs official manufacturer URL verification",
+      "common_agent_prompts": [
+        "Does the timer light blink?",
+        "Does the remote show an error code?",
+        "Does the outdoor unit fan run?"
+      ]
+    },
+    {
+      "appliance_id": "APL-B1203-WASHER",
+      "unit_id": "B-12-03",
+      "type": "washing_machine",
+      "location": "yard",
+      "brand": "Electrolux",
+      "model": "EWF8025DGWA",
+      "serial_number": "MOCK-ELX-B1203-WM",
+      "installed_on": "2025-01-18",
+      "warranty_expires_on": "2027-01-17",
+      "manual_source_status": "needs official manufacturer URL verification",
+      "common_agent_prompts": [
+        "What error code is shown?",
+        "At which stage does the cycle stop?",
+        "Is water left inside the drum?",
+        "Has the drain filter been cleaned recently?"
+      ]
+    },
+    {
+      "appliance_id": "APL-B1203-HOOD",
+      "unit_id": "B-12-03",
+      "type": "cooker_hood",
+      "location": "kitchen",
+      "brand": "Rubine",
+      "model": "RCH-IA90SV",
+      "serial_number": "MOCK-RUB-B1203-HOOD",
+      "installed_on": "2024-05-02",
+      "warranty_expires_on": "2026-05-01",
+      "manual_source_status": "needs official manufacturer URL verification",
+      "common_agent_prompts": [
+        "Are the lights, fan, or both affected?",
+        "Does the hood make unusual noise?",
+        "When were the filters last cleaned?"
+      ]
+    },
+    {
+      "appliance_id": "APL-B1203-WATERHEATER",
+      "unit_id": "B-12-03",
+      "type": "water_heater",
+      "location": "common bathroom",
+      "brand": "Joven",
+      "model": "SL30iP",
+      "serial_number": "MOCK-JOV-B1203-WH",
+      "installed_on": "2024-07-10",
+      "warranty_expires_on": "2026-07-09",
+      "manual_source_status": "needs official manufacturer URL verification",
+      "common_agent_prompts": [
+        "Is there power at the heater indicator?",
+        "Does the ELCB trip?",
+        "Is water leaking from the heater or hose?"
+      ]
+    },
+    {
+      "appliance_id": "APL-A1705-WASHER",
+      "unit_id": "A-17-05",
+      "type": "washing_machine",
+      "location": "yard",
+      "brand": "Samsung",
+      "model": "WW80T3040WW",
+      "serial_number": "MOCK-SAM-A1705-WM",
+      "installed_on": "2023-10-03",
+      "warranty_expires_on": "2025-10-02",
+      "manual_source_status": "needs official manufacturer URL verification",
+      "common_agent_prompts": [
+        "What error code appears?",
+        "Does the door unlock after the failed cycle?",
+        "Is there water pooled near the washer?"
+      ]
+    }
+  ],
+  "approved_contractors": [
+    {
+      "contractor_id": "CON-PLUMB-001",
+      "name": "Mock Sentul Plumbing Response",
+      "trade": [
+        "plumbing"
+      ],
+      "coverage": [
+        "Sentul",
+        "Jalan Ipoh",
+        "Titiwangsa"
+      ],
+      "hours": "Daily 08:00-20:00",
+      "emergency_hours": "24/7 for active flooding",
+      "phone": "+60 12-000 6201",
+      "email": "dispatch.plumbing@example.test",
+      "approval_status": "approved_mock",
+      "standard_callout_myr": 120,
+      "requires_quote_above_myr": 250,
+      "notes": "Use for leaks, clogged drains, tap replacements, and toilet flush repairs."
+    },
+    {
+      "contractor_id": "CON-ELEC-001",
+      "name": "Mock KL Electrical Safety",
+      "trade": [
+        "electrical",
+        "water_heater"
+      ],
+      "coverage": [
+        "Kuala Lumpur",
+        "Sentul"
+      ],
+      "hours": "Mon-Sat 09:00-18:00",
+      "emergency_hours": "24/7 for sparks, burning smell, power trips affecting safety",
+      "phone": "+60 12-000 6202",
+      "email": "dispatch.electrical@example.test",
+      "approval_status": "approved_mock",
+      "standard_callout_myr": 180,
+      "requires_quote_above_myr": 300,
+      "notes": "Escalate crisis reports to duty manager before dispatch."
+    },
+    {
+      "contractor_id": "CON-HVAC-001",
+      "name": "Mock Sentul AC Service",
+      "trade": [
+        "hvac",
+        "air_conditioner"
+      ],
+      "coverage": [
+        "Sentul",
+        "Setapak",
+        "Kepong"
+      ],
+      "hours": "Mon-Sat 09:00-17:00",
+      "emergency_hours": "By manager approval only",
+      "phone": "+60 12-000 6203",
+      "email": "dispatch.ac@example.test",
+      "approval_status": "approved_mock",
+      "standard_callout_myr": 100,
+      "requires_quote_above_myr": 250,
+      "notes": "Use for routine cleaning, weak airflow, water dripping, and cooling complaints."
+    },
+    {
+      "contractor_id": "CON-APPL-001",
+      "name": "Mock Appliance Care KL",
+      "trade": [
+        "washing_machine",
+        "cooker_hood",
+        "appliance"
+      ],
+      "coverage": [
+        "Kuala Lumpur",
+        "Selangor"
+      ],
+      "hours": "Mon-Fri 09:00-18:00",
+      "emergency_hours": "None",
+      "phone": "+60 12-000 6204",
+      "email": "dispatch.appliance@example.test",
+      "approval_status": "approved_mock",
+      "standard_callout_myr": 150,
+      "requires_quote_above_myr": 400,
+      "notes": "Collect brand, model, serial number, error code, and warranty status before dispatch."
+    },
+    {
+      "contractor_id": "CON-PEST-001",
+      "name": "Mock Pest Control Sentul",
+      "trade": [
+        "pest"
+      ],
+      "coverage": [
+        "Sentul",
+        "Kuala Lumpur"
+      ],
+      "hours": "Mon-Sat 10:00-18:00",
+      "emergency_hours": "None",
+      "phone": "+60 12-000 6205",
+      "email": "dispatch.pest@example.test",
+      "approval_status": "approved_mock",
+      "standard_callout_myr": 160,
+      "requires_quote_above_myr": 300,
+      "notes": "Ask which rooms are affected and whether food or children/pets are present."
+    }
+  ],
+  "maintenance_history_enrichment": [
+    {
+      "record_id": "MH-B1203-2026-001",
+      "ticket_id": "DEMO-0009",
+      "unit_id": "A-09-03",
+      "issue_type": "plumbing",
+      "contractor_id": "CON-PLUMB-001",
+      "reported_on": "2026-09-10",
+      "completed_on": "2026-09-12",
+      "work_summary": "Replaced bathroom tap washer and checked pressure.",
+      "cost_myr": 95,
+      "invoice_ref": "INV-MOCK-2026-0910",
+      "repair_warranty_days": 30,
+      "recurrence_note": "If dripping returns within 30 days, reopen with same contractor."
+    },
+    {
+      "record_id": "MH-B1203-2026-002",
+      "ticket_id": "DEMO-0006",
+      "unit_id": "A-17-05",
+      "issue_type": "appliance",
+      "contractor_id": "CON-APPL-001",
+      "reported_on": "2026-09-13",
+      "completed_on": null,
+      "work_summary": "Washing machine stops mid-cycle; model and error code required before technician assignment.",
+      "cost_myr": null,
+      "invoice_ref": null,
+      "repair_warranty_days": null,
+      "recurrence_note": "Check warranty status and collect exact error code."
+    },
+    {
+      "record_id": "MH-B1203-2026-003",
+      "ticket_id": "DEMO-0014",
+      "unit_id": "B-10-05",
+      "issue_type": "hvac",
+      "contractor_id": "CON-HVAC-001",
+      "reported_on": "2026-09-13",
+      "completed_on": null,
+      "work_summary": "Main bedroom AC weak airflow; tenant selected afternoon appointment pending approval.",
+      "cost_myr": null,
+      "invoice_ref": null,
+      "repair_warranty_days": null,
+      "recurrence_note": "Compare with previous AC cleaning date before approving chemical service."
+    }
+  ],
+  "potential_contractor_candidates": [
+    {
+      "name": "Mr. Fix Sentul",
+      "url": "https://mrfixenterprise.com/sentul/",
+      "trade_fit": [
+        "plumbing",
+        "electrical",
+        "air-conditioning"
+      ],
+      "verification_status": "public candidate; not approved"
+    },
+    {
+      "name": "Empire Plumber Sentul",
+      "url": "https://sentul.empireplumber.com.my/",
+      "trade_fit": [
+        "plumbing"
+      ],
+      "verification_status": "public candidate; not approved"
+    },
+    {
+      "name": "First Electrician Sentul",
+      "url": "https://sentul.firstelectrician.com.my/",
+      "trade_fit": [
+        "electrical"
+      ],
+      "verification_status": "public candidate; not approved"
+    },
+    {
+      "name": "AirconBro Sentul",
+      "url": "https://airconbro.com/sentul/",
+      "trade_fit": [
+        "air-conditioning"
+      ],
+      "verification_status": "public candidate; not approved"
+    },
+    {
+      "name": "ShanBro",
+      "url": "https://www.shanbroelectrician.com/",
+      "trade_fit": [
+        "electrical",
+        "plumbing"
+      ],
+      "verification_status": "public candidate; not approved"
+    }
+  ]
+}

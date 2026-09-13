@@ -192,7 +192,7 @@ def main():
         threading.Thread(target=poll, args=(engine,), daemon=True).start()
     port = int(os.getenv('PORT', '8080'))
     server = ThreadingHTTPServer(('127.0.0.1', port), handler_for(engine))
-    print(f'TenantTriage running at http://127.0.0.1:{port} ({"DEMO — simulated actions" if config.demo else "LIVE"})', flush=True)
+    print(f'UnitCue running at http://127.0.0.1:{port} ({"DEMO — simulated actions" if config.demo else "LIVE"})', flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

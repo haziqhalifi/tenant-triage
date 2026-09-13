@@ -18,6 +18,12 @@ def process_update(engine, update):
         try:
             sender = str(callback['from']['id'])
             data = callback.get('data', '')
+            if data.split(':')[0] in ['pick', 'other', 'approve', 'decline']:
+                parts = data.split(':')
+                if len(parts) not in [3, 4]:
+                    raise ValueError('Invalid scheduling action')
+                result = engine.scheduling_action(parts[1], sender, parts[0], int(parts[2]), parts[3] if len(parts) == 4 else None)
+                message = result['state'].replace('_', ' ')
             if data.startswith('ack:'):
                 engine.acknowledge(data[4:], sender)
                 message = 'Case acknowledged'
@@ -62,8 +68,25 @@ def poll(engine):
 
 def handler_for(engine):
     token = secrets.token_urlsafe(32)
+    sessions = {}
+    failures = []
+    password_file = ROOT / 'data' / 'manager-access.txt'
+    if not password_file.exists():
+        password_file.write_text(secrets.token_urlsafe(24))
+        password_file.chmod(0o600)
+    password = password_file.read_text().strip()
 
     class Handler(BaseHTTPRequestHandler):
+        def unlocked(self):
+            from http.cookies import SimpleCookie
+            cookie = SimpleCookie()
+            try:
+                cookie.load(self.headers.get('Cookie', ''))
+                value = cookie.get('manager_session')
+                return bool(value and sessions.get(value.value, 0) > time.time())
+            except Exception:
+                return False
+
         def log_message(self, *_):
             pass
 
@@ -85,7 +108,7 @@ def handler_for(engine):
             if not self.valid_host():
                 return self.respond(403, {'error': 'Local access only'})
             if self.path == '/api/state':
-                return self.respond(200, {**engine.snapshot(), 'csrf': token})
+                return self.respond(200, {**engine.snapshot(), 'csrf': token, 'unlocked': self.unlocked() or engine.c.demo})
             files = {'/': ('index.html', 'text/html; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8')}
             if self.path not in files:
                 return self.respond(404, {'error': 'Not found'})
@@ -95,9 +118,6 @@ def handler_for(engine):
         def do_POST(self):
             if not self.valid_host() or self.headers.get('X-CSRF-Token') != token:
                 return self.respond(403, {'error': 'Refresh the local console before trying again.'})
-            # Console mutations are demo-only; live authority is tied to Telegram user IDs.
-            if not engine.c.demo:
-                return self.respond(403, {'error': 'Use the registered Telegram chats for live actions.'})
             try:
                 length = int(self.headers.get('Content-Length', '0'))
                 if length < 1 or length > 10000:
@@ -105,6 +125,31 @@ def handler_for(engine):
                 data = json.loads(self.rfile.read(length))
                 if not isinstance(data, dict):
                     raise ValueError('Expected an object')
+                if self.path == '/api/login':
+                    failures[:] = [t for t in failures if time.time()-t < 60]
+                    if len(failures) >= 5:
+                        return self.respond(429, {'error':'Too many attempts. Wait one minute.'})
+                    if not isinstance(data.get('password'),str) or not secrets.compare_digest(data['password'], password):
+                        failures.append(time.time())
+                        return self.respond(401, {'error':'Incorrect manager access key.'})
+                    sid = secrets.token_urlsafe(32)
+                    sessions[sid] = time.time() + 8*3600
+                    self.send_response(200)
+                    self.send_header('Set-Cookie', f'manager_session={sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800')
+                    self.send_header('Content-Type','application/json')
+                    self.end_headers()
+                    self.wfile.write(b'{"ok":true}')
+                    return
+                if self.path == '/api/logout':
+                    from http.cookies import SimpleCookie
+                    cookie=SimpleCookie(self.headers.get('Cookie',''))
+                    if cookie.get('manager_session'):
+                        sessions.pop(cookie['manager_session'].value,None)
+                    return self.respond(200, {'ok':True})
+                if not engine.c.demo and not self.unlocked():
+                    return self.respond(403, {'error':'Unlock manager controls to make changes.'})
+                if not engine.c.demo and (self.path in ['/api/message','/api/fail-email'] or self.path == '/api/schedule' and data.get('action') not in ['approve','decline']):
+                    return self.respond(403, {'error':'Tenant actions must come from the registered Telegram account.'})
                 if self.path == '/api/message':
                     if not isinstance(data.get('text'), str):
                         raise ValueError('Message text is required')
@@ -112,11 +157,21 @@ def handler_for(engine):
                 elif self.path in ['/api/ack', '/api/close']:
                     result = engine.acknowledge(data.get('ticket_id'), engine.c.manager, close=self.path == '/api/close')
                 elif self.path == '/api/retry':
+                    if not isinstance(data.get('action_id'),str) or not engine.query('SELECT id FROM actions WHERE id=?',(data['action_id'],)):
+                        raise ValueError('Action not found')
                     engine.dispatch(data.get('action_id'))
                     result = {'ok': True}
+                elif self.path == '/api/schedule':
+                    action = data.get('action')
+                    result = engine.scheduling_action(data.get('ticket_id'), engine.c.manager if action in ['approve', 'decline'] else engine.c.tenant,
+                        action, data.get('revision'), data.get('slot'))
                 elif self.path == '/api/fail-email':
                     engine.adapter.fail_next_email = True
                     result = {'ok': True}
+                elif self.path == '/api/details':
+                    result = engine.update_details(data.get('ticket_id'),data.get('owner'),data.get('next_step'))
+                elif self.path == '/api/note':
+                    result = engine.add_note(data.get('ticket_id'),data.get('text'))
                 else:
                     return self.respond(404, {'error': 'Not found'})
                 self.respond(200, result)

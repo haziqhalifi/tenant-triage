@@ -5,13 +5,15 @@ import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from adapters import Adapters, LEVELS
+from scheduling import Scheduling
+from dashboard import Dashboard
 
 
 def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-class Engine:
+class Engine(Scheduling, Dashboard):
     def __init__(self, config, adapter=None):
         self.c = config
         self.adapter = adapter or Adapters(config)
@@ -32,6 +34,8 @@ class Engine:
             CREATE TABLE IF NOT EXISTS updates (id TEXT PRIMARY KEY, result TEXT);
             CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
         ''')
+        self.init_scheduling()
+        self.init_dashboard()
 
     def query(self, sql, args=()):
         return [dict(r) for r in self.db.execute(sql, args).fetchall()]
@@ -65,9 +69,15 @@ class Engine:
                 return json.loads(seen[0]['result'])
             rows = self.query("SELECT * FROM tickets WHERE chat_id=? AND status!='closed' ORDER BY created_at DESC LIMIT 1", (str(chat_id),))
             previous = rows[0] if rows else None
+            if previous and self.scheduling_text(previous, text):
+                result = {'ticket_id': previous['id'], 'reply': self.scheduling_status(previous['id'])}
+                with self.db:
+                    self.db.execute('INSERT INTO updates VALUES (?,?)', (str(update_id), json.dumps(result)))
+                self.dispatch()
+                return result
             if text.lower() in ['/start', '/help']:
                 result = {'reply': 'Send a maintenance report and optional photo. /status checks your active case. '
-                          'Follow-up messages update that case until the manager closes it.'}
+                          'Use /slots for routine AC inspection options. Follow-up messages update the case until the manager closes it.'}
                 with self.db:
                     self.queue(None, 'telegram', {'chat_id': self.c.tenant, 'text': result['reply']})
                     self.db.execute('INSERT INTO updates VALUES (?,?)', (str(update_id), json.dumps(result)))
@@ -144,6 +154,12 @@ class Engine:
                     response += 'Automatic assessment is unavailable; your report has been saved for human review. '
                 response += assessment['question'] or 'Use /status to check manager acknowledgement.'
                 self.reply(tid, response)
+                if assessment['issue_type'] == 'hvac' and assessment['urgency'] in ['low', 'medium'] and not assessment['needs_human'] and not assessment['question'] and not self.schedule(tid):
+                    self.offer_slots(tid)
+                elif self.schedule(tid) and (assessment['urgency'] in ['high', 'crisis'] or assessment['needs_human']):
+                    self.db.execute("UPDATE scheduling SET state='needs_manager',revision=revision+1 WHERE ticket_id=?", (tid,))
+                    self.db.execute('UPDATE inspection_slots SET booked_by=NULL WHERE booked_by=?', (tid,))
+                    self.reply(tid, 'Scheduling is paused for manager review. Any local reservation has been released.')
                 result = {'ticket_id': tid, 'reply': response}
                 self.db.execute('INSERT INTO updates VALUES (?,?)', (str(update_id), json.dumps(result)))
             self.dispatch()
@@ -154,7 +170,7 @@ class Engine:
         delivery = actions[0]['status'] if actions else 'not queued'
         return f"{ticket['id']}: {ticket['status'].replace('_', ' ')}. Priority: {ticket['urgency']}. Manager notification: {delivery}. " + (
             'Your manager has acknowledged this case.' if ticket['status'] == 'acknowledged' else 'No current manager acknowledgement recorded.'
-        )
+        ) + self.scheduling_status(ticket['id'])
 
     def acknowledge(self, ticket_id, manager_id, close=False):
         with self.lock:
@@ -167,8 +183,11 @@ class Engine:
             if ticket['status'] == 'closed' or ticket['status'] == target:
                 return {'ticket_id': ticket_id, 'status': ticket['status']}
             with self.db:
+                if close:
+                    self.db.execute("UPDATE scheduling SET state='closed',revision=revision+1 WHERE ticket_id=?", (ticket_id,))
+                    self.db.execute('UPDATE inspection_slots SET booked_by=NULL WHERE booked_by=?', (ticket_id,))
                 self.db.execute('UPDATE tickets SET status=?,updated_at=? WHERE id=?', (target, now(), ticket_id))
-                text = f'{ticket_id}: Your property manager has ' + ('closed the case. Send a new report if the issue continues.' if close else 'acknowledged your report and will coordinate the next step. An appointment has not been booked yet.')
+                text = f'{ticket_id}: Your property manager has ' + ('closed the case. Send a new report if the issue continues.' if close else 'acknowledged your report and will coordinate the next step.') + self.scheduling_status(ticket_id)
                 self.db.execute('INSERT INTO messages(ticket_id,role,text,created_at) VALUES (?,?,?,?)',
                                 (ticket_id, 'manager', 'Case ' + target, now()))
                 self.reply(ticket_id, text)
@@ -182,6 +201,10 @@ class Engine:
                     # Explicit retry may duplicate Telegram delivery after an ambiguous timeout.
                     self.db.execute("UPDATE actions SET status='pending' WHERE id=? AND status IN ('failed','uncertain')", (retry_id,))
             for action in self.query("SELECT * FROM actions WHERE status='pending' ORDER BY created_at,id"):
+                if action['kind'] == 'email' and not self.c.demo and not self.c.resend_key:
+                    with self.db:
+                        self.db.execute("UPDATE actions SET status='disabled',error='Email is not configured. Manager notifications use Telegram.',updated_at=? WHERE id=?", (now(), action['id']))
+                    continue
                 if action['kind'] == 'assessment':
                     with self.db:
                         self.db.execute("UPDATE actions SET status='recorded' WHERE id=?", (action['id'],))
@@ -208,5 +231,13 @@ class Engine:
                     'email_failure_armed': self.adapter.fail_next_email,
                     'tenant': self.c.tenant_name, 'model': 'Local rule simulation' if self.c.demo else self.c.model,
                     'tickets': self.query('SELECT * FROM tickets ORDER BY created_at DESC'),
+                    'scheduling': self.query('SELECT * FROM scheduling'),
+                    'slots': self.query('SELECT * FROM inspection_slots ORDER BY starts_at'),
+                    'details': self.query('SELECT * FROM case_details'),
+                    'notes': self.query('SELECT * FROM case_notes ORDER BY id'),
+                    'services': {'telegram': 'configured' if self.c.telegram_token else 'not configured',
+                                 'model': 'configured' if self.c.openrouter_key or self.c.openai_key else 'not configured',
+                                 'email': 'configured' if self.c.resend_key else 'disabled',
+                                 'calendar': 'Local demo calendar'},
                     'messages': self.query('SELECT * FROM messages ORDER BY id'),
                     'actions': [{**a, 'payload': json.loads(a['payload'])} for a in self.query('SELECT * FROM actions ORDER BY created_at DESC')]}

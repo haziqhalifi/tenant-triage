@@ -52,6 +52,16 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(retried['status'], 'simulated')
         self.assertEqual(retried['attempts'], 2)
 
+    def test_unconfigured_live_email_is_disabled_without_network_call(self):
+        self.config.demo = False
+        self.config.resend_key = ''
+        with self.engine.db:
+            self.engine.queue(None, 'email', {'subject': 'Test', 'text': 'Test'})
+        with patch.object(self.engine.adapter, 'send') as send:
+            self.engine.dispatch()
+            send.assert_not_called()
+        self.assertEqual(self.engine.snapshot()['actions'][0]['status'], 'disabled')
+
     def test_authorization_and_repeated_acknowledgement(self):
         with self.assertRaises(PermissionError):
             self.engine.receive('x', 'stranger', 'leak')

@@ -34,11 +34,13 @@ class Config:
     def validate(self):
         if not self.demo:
             required = {'OPENROUTER_API_KEY or OPENAI_API_KEY': self.openrouter_key or self.openai_key, 'TELEGRAM_BOT_TOKEN': self.telegram_token,
-                        'RESEND_API_KEY': self.resend_key, 'RESEND_FROM': self.sender,
-                        'MANAGER_EMAIL': self.manager_email, 'MANAGER_CHAT_ID': self.manager,
+                        'MANAGER_CHAT_ID': self.manager,
                         'TENANT_CHAT_ID': self.tenant}
             missing = [k for k, v in required.items() if not v]
             if missing:
                 raise ValueError('Live mode requires: ' + ', '.join(missing))
+            email_settings = [self.resend_key, self.sender, self.manager_email]
+            if any(email_settings) and not all(email_settings):
+                raise ValueError('Set all Resend settings or leave RESEND_API_KEY, RESEND_FROM, and MANAGER_EMAIL empty.')
             if self.manager == self.tenant or not self.manager.isdigit() or not self.tenant.isdigit():
                 raise ValueError('Use distinct positive numeric private-chat IDs for manager and tenant.')

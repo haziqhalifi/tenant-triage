@@ -7,13 +7,14 @@ from datetime import datetime, timedelta, timezone
 from adapters import Adapters, LEVELS
 from scheduling import Scheduling
 from dashboard import Dashboard
+from workflow import Workflow
 
 
 def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-class Engine(Scheduling, Dashboard):
+class Engine(Scheduling, Dashboard, Workflow):
     def __init__(self, config, adapter=None):
         self.c = config
         self.adapter = adapter or Adapters(config)
@@ -36,6 +37,7 @@ class Engine(Scheduling, Dashboard):
         ''')
         self.init_scheduling()
         self.init_dashboard()
+        self.init_workflow()
 
     def query(self, sql, args=()):
         return [dict(r) for r in self.db.execute(sql, args).fetchall()]
@@ -43,6 +45,19 @@ class Engine(Scheduling, Dashboard):
     def ticket(self, ticket_id):
         rows = self.query('SELECT * FROM tickets WHERE id=?', (ticket_id,))
         return rows[0] if rows else None
+
+    def missing_context_question(self, assessment, previous):
+        if previous or assessment['question'] or assessment['needs_human'] or assessment['urgency'] in ['high', 'crisis']:
+            return ''
+        questions = {
+            'plumbing': 'Where is the leak, and is the water contained or still spreading?',
+            'hvac': 'Which room is affected, and is the AC blowing air but not cooling?',
+            'appliance': 'Which appliance is affected, and what happens when you try to use it?',
+            'pest': 'Where did you see the pests, and when did you first notice them?',
+            'noise': 'Where is the noise coming from, and when does it usually happen?',
+            'other': 'What is affected, and what is happening right now?',
+        }
+        return questions.get(assessment['issue_type'], '')
 
     def queue(self, ticket_id, kind, payload):
         aid = str(uuid.uuid4())
@@ -69,6 +84,22 @@ class Engine(Scheduling, Dashboard):
                 return json.loads(seen[0]['result'])
             rows = self.query("SELECT * FROM tickets WHERE chat_id=? AND status!='closed' ORDER BY created_at DESC LIMIT 1", (str(chat_id),))
             previous = rows[0] if rows else None
+            selected = self.query("SELECT value FROM meta WHERE key='active_case'")
+            if selected:
+                previous = self.ticket(selected[0]['value'])
+            with self.db:
+                command, previous, new_text = self.workflow_command(text, previous)
+                if command and new_text:
+                    text = new_text
+                    command = None
+                if command:
+                    self.reply(command.get('ticket_id'), command['reply'])
+                    self.db.execute('INSERT INTO updates VALUES (?,?)', (str(update_id), json.dumps(command)))
+            if command:
+                self.dispatch()
+                return command
+            if previous and previous['status'] == 'closed':
+                previous = None
             if previous and self.scheduling_text(previous, text):
                 result = {'ticket_id': previous['id'], 'reply': self.scheduling_status(previous['id'])}
                 with self.db:
@@ -77,7 +108,8 @@ class Engine(Scheduling, Dashboard):
                 return result
             if text.lower() in ['/start', '/help']:
                 result = {'reply': 'Send a maintenance report and optional photo. /status checks your active case. '
-                          'Use /slots for routine AC inspection options. Follow-up messages update the case until the manager closes it.'}
+                          'Use /new to start a separate report, /cases to list reports, /case TKT-ID to switch cases, '
+                          'and /slots for routine AC inspection options.'}
                 with self.db:
                     self.queue(None, 'telegram', {'chat_id': self.c.tenant, 'text': result['reply']})
                     self.db.execute('INSERT INTO updates VALUES (?,?)', (str(update_id), json.dumps(result)))
@@ -104,7 +136,7 @@ class Engine(Scheduling, Dashboard):
                               'summary': text[:400] or 'Photo report requires human review',
                               'question': '', 'needs_human': True}
             # Explicit danger reports override model decisions; priority never drops automatically.
-            if any(word in text.lower() for word in ['sparks', 'gas smell', 'on fire', 'live wire', 'water reaching the socket']):
+            if any(word in text.lower() for word in ['sparks', 'gas smell', 'on fire', 'live wire', 'water reaching the socket', 'water is spreading near the socket']):
                 assessment.update(urgency='crisis', needs_human=True, question='')
             if previous and LEVELS.index(previous['urgency']) > LEVELS.index(assessment['urgency']):
                 assessment['urgency'] = previous['urgency']
@@ -114,17 +146,17 @@ class Engine(Scheduling, Dashboard):
                 assessment.update(needs_human=True, question='')
             if previous and previous['needs_human']:
                 assessment['needs_human'] = True
-            if previous and previous['question'] and assessment['question']:
-                assessment.update(needs_human=True, question='')
+            assessment['question'] = self.intake_question(tid, assessment, text) if not previous or previous['question'] else ''
             status = 'escalated' if assessment['needs_human'] or assessment['urgency'] == 'crisis' else ('waiting_on_tenant' if assessment['question'] else 'open')
-            if previous and previous['status'] == 'acknowledged' and assessment['urgency'] == previous['urgency']:
-                status = 'acknowledged'
+            if previous and previous['status'] in ['acknowledged', 'assigned', 'in_progress', 'awaiting_confirmation'] and assessment['urgency'] == previous['urgency']:
+                status = previous['status']
             hours = {'low': 48, 'medium': 48, 'high': 2, 'crisis': 0}[assessment['urgency']]
             due = (datetime.now(timezone.utc) + timedelta(hours=hours)).isoformat()
             if previous:
                 due = min(due, previous['due_at'])
             stamp = now()
             with self.db:
+                self.db.execute("INSERT OR REPLACE INTO meta VALUES ('active_case',?)", (tid,))
                 self.db.execute('INSERT OR REPLACE INTO tickets VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                     (tid, str(chat_id), self.c.unit, assessment['issue_type'], assessment['urgency'],
                      assessment['summary'], assessment['question'], status, int(assessment['needs_human']),
@@ -133,12 +165,19 @@ class Engine(Scheduling, Dashboard):
                                 (tid, 'tenant', text or 'Photo attached', photo, stamp))
                 self.queue(tid, 'assessment', {'text': 'Human fallback: model assessment unavailable.' if assessment_failed else
                            f"{assessment['issue_type']} · {assessment['urgency']} · Property SOP v1", 'assessment': assessment})
-                notify = not previous or previous['urgency'] != assessment['urgency'] or (assessment['needs_human'] and not previous['needs_human']) or (previous['question'] and not assessment['question'])
+                notify = not assessment['question']
                 if notify:
                     manager_text = f"{tid} | Unit {self.c.unit} | {assessment['urgency'].upper()}\n{assessment['summary']}\nStatus: {status}.\n" + (
                         'Immediate human attention required.' if hours == 0 else f'Property SOP response target: {hours} hours; this is not a repair guarantee.')
                     if assessment['question']:
                         manager_text += '\nAwaiting tenant: ' + assessment['question']
+                    intake = self.query('SELECT answers FROM intake WHERE ticket_id=?', (tid,))
+                    if intake:
+                        manager_text += '\nContext: ' + json.dumps(json.loads(intake[0]['answers']), ensure_ascii=False)[:2400]
+                    if previous and previous['question']:
+                        self.db.execute('UPDATE tickets SET due_at=? WHERE id=?', ((datetime.now(timezone.utc) + timedelta(hours=hours)).isoformat(), tid))
+                    if previous and previous['urgency'] != assessment['urgency']:
+                        self.db.execute('UPDATE workflow SET reminder_at=? WHERE ticket_id=?', (due, tid))
                     self.queue(tid, 'telegram', {'chat_id': self.c.manager, 'text': manager_text, 'buttons': True})
                     if assessment['urgency'] in ['high', 'crisis'] or assessment['needs_human']:
                         self.queue(tid, 'email', {'subject': f"[{assessment['urgency'].upper()}] {tid} — Unit {self.c.unit}", 'text': manager_text})
@@ -148,8 +187,10 @@ class Engine(Scheduling, Dashboard):
                     response += 'Immediate human attention is needed. Keep away from the hazard; contact local emergency services if there is immediate danger. Do not wait for this chat. '
                 elif assessment['needs_human']:
                     response += 'This needs your property manager’s review. '
+                elif assessment['question']:
+                    response += 'I need one more detail before submitting it to your property manager. '
                 else:
-                    response += f'Property SOP response target: {hours} hours, not a guaranteed repair time. '
+                    response += f'Report submitted for manager review. Property SOP response target: {hours} hours, not a guaranteed repair time. '
                 if assessment_failed:
                     response += 'Automatic assessment is unavailable; your report has been saved for human review. '
                 response += assessment['question'] or 'Use /status to check manager acknowledgement.'
@@ -169,7 +210,7 @@ class Engine(Scheduling, Dashboard):
         actions = self.query("SELECT status FROM actions WHERE ticket_id=? AND kind='telegram' AND json_extract(payload,'$.chat_id')=? ORDER BY created_at DESC LIMIT 1", (ticket['id'], self.c.manager))
         delivery = actions[0]['status'] if actions else 'not queued'
         return f"{ticket['id']}: {ticket['status'].replace('_', ' ')}. Priority: {ticket['urgency']}. Manager notification: {delivery}. " + (
-            'Your manager has acknowledged this case.' if ticket['status'] == 'acknowledged' else 'No current manager acknowledgement recorded.'
+            'Your manager has acknowledged this case.' if ticket['status'] in ['acknowledged', 'assigned', 'in_progress', 'awaiting_confirmation'] else 'No current manager acknowledgement recorded.'
         ) + self.scheduling_status(ticket['id'])
 
     def acknowledge(self, ticket_id, manager_id, close=False):
@@ -179,7 +220,11 @@ class Engine(Scheduling, Dashboard):
             ticket = self.ticket(ticket_id)
             if not ticket:
                 raise ValueError('Case not found')
-            target = 'closed' if close else 'acknowledged'
+            if close:
+                return self.repair_update(ticket_id, manager_id, 'complete', 'Manager reports the repair is complete.')
+            target = 'acknowledged'
+            if ticket['status'] in ['assigned', 'in_progress', 'awaiting_confirmation']:
+                return {'ticket_id': ticket_id, 'status': ticket['status']}
             if ticket['status'] == 'closed' or ticket['status'] == target:
                 return {'ticket_id': ticket_id, 'status': ticket['status']}
             with self.db:
@@ -187,6 +232,7 @@ class Engine(Scheduling, Dashboard):
                     self.db.execute("UPDATE scheduling SET state='closed',revision=revision+1 WHERE ticket_id=?", (ticket_id,))
                     self.db.execute('UPDATE inspection_slots SET booked_by=NULL WHERE booked_by=?', (ticket_id,))
                 self.db.execute('UPDATE tickets SET status=?,updated_at=? WHERE id=?', (target, now(), ticket_id))
+                self.reset_reminder(ticket_id)
                 text = f'{ticket_id}: Your property manager has ' + ('closed the case. Send a new report if the issue continues.' if close else 'acknowledged your report and will coordinate the next step.') + self.scheduling_status(ticket_id)
                 self.db.execute('INSERT INTO messages(ticket_id,role,text,created_at) VALUES (?,?,?,?)',
                                 (ticket_id, 'manager', 'Case ' + target, now()))
@@ -234,6 +280,7 @@ class Engine(Scheduling, Dashboard):
                     'scheduling': self.query('SELECT * FROM scheduling'),
                     'slots': self.query('SELECT * FROM inspection_slots ORDER BY starts_at'),
                     'details': self.query('SELECT * FROM case_details'),
+                    'workflow': self.query('SELECT * FROM workflow'),
                     'notes': self.query('SELECT * FROM case_notes ORDER BY id'),
                     'services': {'telegram': 'configured' if self.c.telegram_token else 'not configured',
                                  'model': 'configured' if self.c.openrouter_key or self.c.openai_key else 'not configured',

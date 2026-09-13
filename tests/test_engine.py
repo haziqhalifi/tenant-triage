@@ -41,6 +41,31 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(first, duplicate)
         self.assertEqual(before, self.engine.snapshot())
 
+    def test_routine_ac_asks_context_before_manager_submission(self):
+        result = self.send('AC not cold. I already cleaned the filter.')
+        ticket = self.engine.ticket(result['ticket_id'])
+        self.assertEqual(ticket['status'], 'waiting_on_tenant')
+        self.assertIn('Which room is affected', result['reply'])
+        manager_actions = [
+            a for a in self.engine.snapshot()['actions']
+            if a['kind'] == 'telegram' and a['payload'].get('chat_id') == self.config.manager
+        ]
+        self.assertFalse(manager_actions)
+
+        followup = self.send('Bedroom. It is blowing air but not cooling.', '2')
+        self.assertEqual(followup['ticket_id'], result['ticket_id'])
+        self.assertEqual(self.engine.ticket(result['ticket_id'])['status'], 'waiting_on_tenant')
+        for i, text in enumerate(['Since yesterday, constant.', 'Room is hot, no damage.', 'Filter cleaned. Available tomorrow.']):
+            self.send(text, 'intake'+str(i))
+        ticket = self.engine.ticket(result['ticket_id'])
+        self.assertEqual(ticket['status'], 'open')
+        self.assertFalse(ticket['question'])
+        manager_actions = [
+            a for a in self.engine.snapshot()['actions']
+            if a['kind'] == 'telegram' and a['payload'].get('chat_id') == self.config.manager
+        ]
+        self.assertEqual(len(manager_actions), 1)
+
     def test_email_failure_is_persisted_and_retry_is_local(self):
         self.engine.adapter.fail_next_email = True
         self.send('The leak is spreading')
@@ -96,8 +121,9 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(ticket['question'])
 
     def test_close_then_new_report_creates_new_ticket(self):
-        first = self.send('AC not cold')['ticket_id']
+        first = self.send('The leak is spreading')['ticket_id']
         self.engine.acknowledge(first, self.config.manager, close=True)
+        self.send('/resolved '+first, 'confirm')
         second = self.send('The sink is leaking', '2')['ticket_id']
         self.assertNotEqual(first, second)
 

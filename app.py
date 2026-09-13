@@ -36,7 +36,15 @@ def process_update(engine, update):
         return
     chat = str(message['chat']['id'])
     text = message.get('text', message.get('caption', ''))
-    if chat == engine.c.manager and text.startswith('/close '):
+    if chat == engine.c.manager and text.split(' ')[0] in ['/assign', '/progress', '/complete']:
+        parts = text.split(maxsplit=2)
+        try:
+            if len(parts) != 3:
+                raise ValueError('Use /assign TKT-ID technician, /progress TKT-ID update, or /complete TKT-ID repair details.')
+            engine.repair_update(parts[1].upper(), chat, parts[0][1:], parts[2])
+        except (ValueError, PermissionError) as exc:
+            engine.adapter.telegram('sendMessage', {'chat_id': chat, 'text': str(exc)})
+    elif chat == engine.c.manager and text.startswith('/close '):
         try:
             engine.acknowledge(text.split(maxsplit=1)[1].strip(), chat, close=True)
         except ValueError:
@@ -64,6 +72,15 @@ def poll(engine):
         except Exception as exc:
             print('Telegram polling interrupted:', type(exc).__name__, '(retrying)', flush=True)
             time.sleep(3)
+
+
+def reminder_worker(engine):
+    while True:
+        try:
+            engine.reminders()
+        except Exception as exc:
+            print('Reminder check interrupted:', type(exc).__name__, flush=True)
+        time.sleep(60)
 
 
 def handler_for(engine):
@@ -107,9 +124,19 @@ def handler_for(engine):
         def do_GET(self):
             if not self.valid_host():
                 return self.respond(403, {'error': 'Local access only'})
+            if self.path == '/narration.m4a':
+                audio = ROOT / 'data' / 'narration.m4a'
+                if not engine.c.demo or not audio.exists():
+                    return self.respond(404, {'error': 'Narration unavailable'})
+                return self.respond(200, audio.read_bytes(), 'audio/mp4')
             if self.path == '/api/state':
                 return self.respond(200, {**engine.snapshot(), 'csrf': token, 'unlocked': self.unlocked() or engine.c.demo})
             files = {'/': ('index.html', 'text/html; charset=utf-8'), '/app.js': ('app.js', 'text/javascript; charset=utf-8'), '/style.css': ('style.css', 'text/css; charset=utf-8')}
+            for photo in ['ceiling-leak', 'damaged-socket', 'dripping-ac']:
+                files['/demo-photos/'+photo+'.jpg'] = ('demo-photos/'+photo+'.jpg', 'image/jpeg')
+            files['/narration.js'] = ('narration.js', 'text/javascript; charset=utf-8')
+            if self.path.startswith('/?narration='):
+                self.path = '/'
             if self.path not in files:
                 return self.respond(404, {'error': 'Not found'})
             name, mime = files[self.path]
@@ -170,6 +197,8 @@ def handler_for(engine):
                     result = {'ok': True}
                 elif self.path == '/api/details':
                     result = engine.update_details(data.get('ticket_id'),data.get('owner'),data.get('next_step'))
+                elif self.path == '/api/repair':
+                    result = engine.repair_update(data.get('ticket_id'), engine.c.manager, data.get('action'), data.get('text', ''))
                 elif self.path == '/api/note':
                     result = engine.add_note(data.get('ticket_id'),data.get('text'))
                 else:
@@ -190,6 +219,7 @@ def main():
     engine.recover()
     if not config.demo:
         threading.Thread(target=poll, args=(engine,), daemon=True).start()
+        threading.Thread(target=reminder_worker, args=(engine,), daemon=True).start()
     port = int(os.getenv('PORT', '8080'))
     server = ThreadingHTTPServer(('127.0.0.1', port), handler_for(engine))
     print(f'UnitCue running at http://127.0.0.1:{port} ({"DEMO — simulated actions" if config.demo else "LIVE"})', flush=True)

@@ -130,7 +130,9 @@ class Scheduling:
             return False
         if low == '/slots':
             with self.db:
-                if ticket['issue_type'] != 'hvac' or ticket['urgency'] in ['high', 'crisis'] or ticket['needs_human']:
+                if ticket['question'] or ticket['status'] == 'waiting_on_tenant':
+                    self.reply(ticket['id'], 'Please finish the report details before choosing an inspection slot. ' + ticket['question'])
+                elif ticket['issue_type'] != 'hvac' or ticket['urgency'] in ['high', 'crisis'] or ticket['needs_human']:
                     self.reply(ticket['id'], 'This case needs manager coordination before scheduling.')
                 elif current and current['state'] in ['booked', 'awaiting_approval']:
                     self.reply(ticket['id'], self.scheduling_status(ticket['id']))

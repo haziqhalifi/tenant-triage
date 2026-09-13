@@ -65,6 +65,14 @@ def seed():
                 engine.db.execute('INSERT INTO actions VALUES (?,?,?,?,?,?,?,?,?)',
                     (f'fixture-{i}-{j}',tid,kind,json.dumps(payload),outcome,attempts,error,updated,updated))
             added+=1
+        # Add attachments to existing fictional reports without replacing user edits.
+        for number, filename in [(1,'ceiling-leak'),(2,'damaged-socket'),(4,'dripping-ac')]:
+            tid=f'DEMO-{number:04d}'
+            engine.db.execute("""UPDATE messages SET photo=? WHERE id=(
+                SELECT MIN(m.id) FROM messages m JOIN tickets t ON t.id=m.ticket_id
+                WHERE m.ticket_id=? AND m.role='tenant' AND t.chat_id=?)
+                AND (photo IS NULL OR photo='')""",
+                ('/demo-photos/'+filename+'.jpg',tid,f'fixture-tenant-{number}'))
         # Dedicated slots keep fixture appointments separate from the existing rehearsal case.
         base=stamp.astimezone(timezone(timedelta(hours=8))).replace(hour=10,minute=0,second=0,microsecond=0)+timedelta(days=1)
         for n,(case,state) in enumerate([(3,'awaiting_approval'),(4,'booked'),(10,'offering'),(14,'awaiting_approval'),(16,'booked')]):

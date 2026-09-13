@@ -4,6 +4,11 @@ const originalFetch=window.fetch.bind(window), key='tenanttriage-public-v1';
 let data;
 const ready=originalFetch('/demo-state.json').then(r=>r.json()).then(seed=>{
  try{data=JSON.parse(localStorage.getItem(key))||seed}catch{data=seed}
+ // Merge newly supplied fixture photos while retaining saved case edits and notes.
+ for(const source of seed.messages.filter(m=>m.photo)){
+   const target=data.messages.find(m=>m.ticket_id===source.ticket_id&&m.role==='tenant');
+   if(target&&!target.photo)target.photo=source.photo;
+ }
  data.unlocked=true;data.mode='demo';data.csrf='public-demo';return data;
 });
 const now=()=>new Date().toISOString(), uuid=()=>crypto.randomUUID();

@@ -20,6 +20,9 @@ class DashboardTests(unittest.TestCase):
         c=Config(demo=True,db=str(self.root/'test.db'))
         self.e=Engine(c)
         self.tid=self.e.receive('initial',c.tenant,'AC not cold')['ticket_id']
+        self.e.receive('context',c.tenant,'Bedroom. It is blowing air but not cooling.')
+        for i, text in enumerate(['Since yesterday, constant.', 'Room is hot, no damage.', 'Filter cleaned. Available tomorrow.']):
+            self.e.receive('intake'+str(i), c.tenant, text)
         c.demo=False
         self.sender=patch.object(self.e.adapter,'send',return_value={})
         self.sender.start()

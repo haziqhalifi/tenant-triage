@@ -12,6 +12,9 @@ class SchedulingTests(unittest.TestCase):
         self.c = Config(demo=True, db=self.temp.name+'/test.db')
         self.e = Engine(self.c)
         self.tid = self.e.receive('1', self.c.tenant, 'AC not cold; filter already cleaned')['ticket_id']
+        self.e.receive('context', self.c.tenant, 'Bedroom. It is blowing air but not cooling.')
+        for i, text in enumerate(['Since yesterday, constant.', 'Room is hot, no damage.', 'Filter cleaned. Available tomorrow.']):
+            self.e.receive('intake'+str(i), self.c.tenant, text)
 
     def tearDown(self):
         self.e.db.close()
@@ -79,6 +82,7 @@ class SchedulingTests(unittest.TestCase):
         s, slot = self.choose()
         self.e.scheduling_action(self.tid,self.c.manager,'approve',s['revision'])
         self.e.acknowledge(self.tid,self.c.manager,close=True)
+        self.e.receive('confirm', self.c.tenant, '/resolved '+self.tid)
         self.assertIsNone(self.e.query('SELECT booked_by FROM inspection_slots WHERE id=?',(slot,))[0]['booked_by'])
         with self.assertRaises(ValueError):
             self.e.scheduling_action(self.tid,self.c.manager,'approve',s['revision'])

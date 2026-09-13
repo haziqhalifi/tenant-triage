@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TenantTriage — Maintenance desk</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><a class="brand" href="/" aria-label="TenantTriage home"><span class="mark" aria-hidden="true">▥</span>TenantTriage</a><span class="header-sub">Maintenance desk</span><span id="mode" class="mode">Connecting…</span></header>
+<main>
+  <section class="intro"><div><p id="property">Your property, connected</p><h1>Every report.<br>A clear next step.</h1></div><div class="intro-note"><span class="signal"></span><p>From the tenant’s first message<br>to the manager’s acknowledgement.</p></div></section>
+  <div id="notice" class="notice">Loading workspace…</div>
+  <div id="error" class="error" role="alert" hidden></div>
+  <section class="desk">
+    <article class="conversation"><div class="panel-head"><div class="avatar">A</div><div><h2 id="tenant">Tenant conversation</h2><p id="unit">Private maintenance chat</p></div><span class="channel">Telegram</span></div>
+      <div id="messages" class="messages" role="log" aria-label="Tenant conversation" aria-live="polite"></div>
+      <div class="composer-area" id="demo-controls"><p class="suggest-label">Try a report</p><div class="suggestions"><button data-message="The kitchen sink is leaking. There is water under the cabinet.">Leaking sink</button><button data-message="The AC is not cold. I already cleaned the filter.">AC not cooling</button><button data-message="Something is wrong in my unit.">Unclear issue</button></div>
+      <form id="composer"><label class="sr-only" for="message">Maintenance message</label><textarea id="message" rows="2" maxlength="4000" placeholder="Describe the issue or send a follow-up…" required></textarea><button class="primary" id="send" type="submit">Send message</button></form><div class="chat-tools"><button data-message="The water is spreading and getting worse.">Send worsening update</button><button data-message="/status">Check status</button></div></div>
+    </article>
+    <article class="cases"><div class="panel-head"><div><h2>Manager’s desk</h2><p>Case ownership & next actions</p></div><span id="count" class="count">0 active</span></div><div id="tickets" class="ticket-list"></div></article>
+  </section>
+  <section class="activity"><div class="activity-head"><div><h2>Action history</h2><p>See what was assessed, queued, and delivered.</p></div><button id="fail-email" class="secondary">Simulate next email failure</button></div><div id="actions"></div></section>
+  <footer><span>TenantTriage / Agents, Everywhere</span><span id="provider">Local rehearsal</span></footer>
+</main><script src="/app.js"></script>
+</body></html>
